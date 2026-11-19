@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f8f9fa">
+  <meta name="description" content="A friendly Python skills assessment by the AI Team at GDG on Campus AASTMT.">
+  <title>Python From Zero · GDGoC AASTMT</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/theme/eclipse.css">
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/python/python.js"></script>
+  <script type="module" src="/static/app.js"></script>
+</head>
+<body>
+  <div class="site-shell">
+    <header class="topbar">
+      <a class="brand" href="#home" aria-label="Python From Zero home" data-action="home">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span class="brand-copy"><strong>Python From Zero</strong><small>GDGoC AASTMT · Round 1</small></span>
+      </a>
+      <nav class="topnav" aria-label="Main navigation">
+        <button class="nav-link" type="button" data-action="dashboard">Quizzes</button>
+        <button class="nav-link" type="button" data-action="leaderboard">Leaderboard</button>
+      </nav>
+      <div class="topbar-student" id="topbar-student" hidden></div>
+    </header>
+
+    <main id="app-main">
+      <section class="view welcome-view" id="view-welcome" aria-labelledby="welcome-title">
+        <div class="welcome-copy">
+          <div class="eyebrow"><span class="google-dot"></span> Python From Zero · Step by Step</div>
+          <h1 id="welcome-title">Hey there, GDGoC AASTMT Explorer! <span>Ready to test your Python skills?</span></h1>
+          <p class="lead">Take a breath, trust what you’ve learned, and work through each question one step at a time.</p>
+          <div class="brand-badge"><span class="mini-brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span> Created by AI Team <span class="badge-divider">|</span> GDG on Campus AASTMT</div>
+        </div>
+        <form class="name-card" id="name-form">
+          <div class="card-icon" aria-hidden="true">01</div>
+          <h2>First, what should we call you?</h2>
+          <p>Your name will appear on the round leaderboard. No password or sign-up needed.</p>
+          <label for="student-name">Full name</label>
+          <input id="student-name" name="name" type="text" autocomplete="name" maxlength="60" placeholder="e.g. Salma Hassan" required>
+          <p class="form-error" id="name-error" role="alert" hidden></p>
+          <button class="button button-primary button-wide" type="submit">Enter Round 1 <span aria-hidden="true">→</span></button>
+          <small class="privacy-note">Your score is saved for this session leaderboard. You can start without a password.</small>
+        </form>
+        <div class="welcome-ribbon" aria-hidden="true"><span>Learn</span><b>·</b><span>Try</span><b>·</b><span>Grow</span></div>
+      </section>
+
+      <section class="view dashboard-view" id="view-dashboard" aria-labelledby="dashboard-title" hidden>
+        <div class="dashboard-heading">
+          <div>
+            <div class="eyebrow"><span class="eyebrow-line"></span> ROUND 1 · 60 QUESTIONS</div>
+            <h1 id="dashboard-title">Your Python path starts here<span class="heading-dot">.</span></h1>
+            <p class="lead" id="dashboard-subtitle">Pick a quiz and take it at your own pace.</p>
+          </div>
+          <div class="score-summary" id="score-summary">
+            <span class="score-summary-label">YOUR TOTAL</span>
+            <strong><span id="my-total-points">0</span><small> pts</small></strong>
+            <span class="score-summary-meta" id="my-solved-count">0 questions solved</span>
+          </div>
+        </div>
+        <div class="dashboard-layout">
+          <div class="quiz-column">
+            <div class="section-heading"><h2>Round 1 quizzes</h2><span>20 questions each · first score counts</span></div>
+            <div class="quiz-list" id="quiz-list"></div>
+            <article class="round-two-card">
+              <div class="round-two-icon" aria-hidden="true">02</div>
+              <div><div class="eyebrow muted">NEXT UP</div><h3>Round 2 <span class="lock-icon" aria-label="Locked">◆</span></h3><p>A new challenge is in the works. Keep an eye out.</p></div>
+              <span class="coming-soon">COMING SOON</span>
+            </article>
+            <p class="storage-note">Scores are stored in this session’s local leaderboard. <button type="button" class="text-button" data-action="storage-info">How scoring works</button></p>
+          </div>
+          <aside class="leaderboard-peek" aria-labelledby="peek-title">
+            <div class="section-heading"><h2 id="peek-title">Global leaderboard</h2><button class="icon-button" type="button" data-action="leaderboard" aria-label="Open full leaderboard">→</button></div>
+            <p class="aside-caption">Every quiz adds to your Round 1 total.</p>
+            <div id="leaderboard-preview" class="leaderboard-preview"><p class="empty-state">The first explorer could be you.</p></div>
+            <button class="button button-secondary button-wide" type="button" data-action="leaderboard">View leaderboard</button>
+          </aside>
+        </div>
+      </section>
+
+      <section class="view quiz-view" id="view-quiz" aria-labelledby="quiz-title" hidden>
+        <div class="quiz-topline">
+          <button class="back-button" type="button" data-action="dashboard"><span aria-hidden="true">←</span> All quizzes</button>
+          <span class="quiz-round-label" id="quiz-round-label">QUIZ 1 · ROUND 1</span>
+          <button class="nav-link" type="button" data-action="leaderboard">Leaderboard</button>
+        </div>
+        <div class="quiz-progress-row">
+          <div><h1 id="quiz-title">Quiz 1</h1><p id="quiz-subtitle">20 questions · steady progress beats speed</p></div>
+          <div class="progress-meta"><span id="progress-count">Question 1 of 20</span><strong id="progress-percent">5%</strong></div>
+        </div>
+        <div class="progress-track" role="progressbar" aria-label="Quiz progress" aria-valuemin="0" aria-valuemax="20" aria-valuenow="1"><span id="progress-bar"></span></div>
+        <div class="quiz-workspace">
+          <article class="question-card" aria-live="polite">
+            <div class="question-meta"><span class="difficulty-badge" id="difficulty-badge">EASY · 1 PT</span><span class="question-number" id="question-number">QUESTION 01</span></div>
+            <h2 id="question-prompt"></h2>
+            <pre class="question-code" id="question-code" hidden><code></code></pre>
+            <div id="answer-area" class="answer-area"></div>
+            <div class="editor-wrap" id="editor-wrap" hidden>
+              <div class="editor-label"><span>PYTHON EDITOR</span><span>Tab indents · Shift+Tab outdents</span></div>
+              <div id="code-editor" class="code-editor"></div>
+              <div class="editor-actions"><button class="button button-secondary" id="run-code" type="button"><span aria-hidden="true">▶</span> Run code</button><span class="editor-hint">Your code runs privately in your browser.</span></div>
+              <div class="console-panel" id="console-panel" aria-live="polite"><div class="console-heading"><span class="console-light"></span> Console</div><pre id="console-output">Run your code to see its output here.</pre></div>
+            </div>
+            <div class="answer-feedback" id="answer-feedback" role="status" hidden></div>
+            <div class="question-footer">
+              <button class="button button-secondary" id="previous-question" type="button" disabled>← Previous</button>
+              <button class="button button-secondary" id="check-answer" type="button">Check answer</button>
+              <span class="check-hint" id="check-hint">You can review your answer before finishing the quiz.</span>
+              <button class="button button-primary" id="next-question" type="button" disabled>Next question <span aria-hidden="true">→</span></button>
+            </div>
+          </article>
+          <aside class="quiz-rail">
+            <div class="rail-card">
+              <div class="rail-number">✦</div><h3>Small steps count</h3><p>Run your code, inspect the output, and adjust. You can move between questions before your final submission.</p>
+            </div>
+            <div class="rail-tip"><span class="tip-icon">i</span><p>Only the <strong>first completed score in this browser session</strong> is saved for this quiz, so take your time.</p></div>
+          </aside>
+        </div>
+        <section class="quiz-result" id="quiz-result" aria-live="polite" hidden>
+          <div class="result-mark" aria-hidden="true">✓</div>
+          <div class="eyebrow"><span class="eyebrow-line"></span> QUIZ COMPLETE</div>
+          <h2>Nice work, <span id="result-name">Explorer</span>.</h2>
+          <p class="result-lead">You finished Quiz <span id="result-quiz-number">1</span>. Every attempt is progress.</p>
+          <div class="result-score"><strong id="result-points">0</strong><span>points earned</span><small id="result-solved">0 of 20 solved</small></div>
+          <p class="result-first-score" id="result-first-score">Your first completed score is saved to the leaderboard.</p>
+          <div class="result-actions"><button class="button button-secondary" type="button" data-action="dashboard">Back to quizzes</button><button class="button button-primary" type="button" data-action="leaderboard">See live leaderboard →</button></div>
+        </section>
+      </section>
+
+      <section class="view leaderboard-view" id="view-leaderboard" aria-labelledby="leaderboard-title" hidden>
+        <div class="leaderboard-header">
+          <div><button class="back-button" type="button" data-action="dashboard"><span aria-hidden="true">←</span> Dashboard</button><div class="eyebrow"><span class="eyebrow-line"></span> ROUND 1 · LIVE</div><h1 id="leaderboard-title">Every step adds up<span class="heading-dot">.</span></h1><p class="lead">A snapshot of our Python explorers and their progress.</p></div>
+          <div class="leaderboard-stat"><span>EXPLORERS</span><strong id="explorer-count">0</strong><small>on the board</small></div>
+        </div>
+        <div class="leaderboard-card">
+          <div class="leaderboard-card-head"><div><h2>Global leaderboard</h2><p>Ranked by total points across all three quizzes.</p></div><button class="refresh-button" id="refresh-leaderboard" type="button">↻ Refresh</button></div>
+          <div class="table-scroll"><table class="score-table"><thead><tr><th scope="col">RANK</th><th scope="col">STUDENT</th><th scope="col">QUIZ 1</th><th scope="col">QUIZ 2</th><th scope="col">QUIZ 3</th><th scope="col">SOLVED</th><th scope="col">TOTAL</th></tr></thead><tbody id="leaderboard-body"></tbody></table></div>
+          <div id="leaderboard-empty" class="empty-state" hidden>There’s room at the top. Start a quiz and your name will appear here.</div>
+          <p class="board-footnote">Quiz scores show points earned. Within a session, only the first completed score per quiz is counted.</p>
+        </div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+    <dialog class="info-dialog" id="info-dialog"><div class="dialog-mark" aria-hidden="true">i</div><h2>How the leaderboard works</h2><p>Within this name-only browser session, each quiz can be submitted once. Your first submitted score is saved, and later submissions from this session cannot replace it. Easy questions are worth 1 point, Medium 2, and Hard 3.</p><p class="dialog-warning"><strong>About local scores:</strong> This version uses a local JSON file on the app server. Hosted runtime files can be temporary, so scores may not survive a restart or redeploy. It is designed for local or single-instance use. Without accounts, this is not tamper-proof anti-cheat.</p><button class="button button-primary" id="close-info" type="button">Got it</button></dialog>
+    <dialog class="confirm-dialog" id="finish-dialog"><div class="dialog-mark green" aria-hidden="true">✓</div><h2>Finish this quiz?</h2><p id="finish-copy">Your score will be submitted and saved.</p><div class="dialog-actions"><button class="button button-secondary" id="cancel-finish" type="button">Keep reviewing</button><button class="button button-primary" id="confirm-finish" type="button">Submit quiz</button></div></dialog>
+    <footer class="site-footer"><span class="footer-brand"><span class="mini-brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span> Created by AI Team <span class="badge-divider">|</span> GDG on Campus AASTMT</span><span>Python From Zero · Round 1</span></footer>
+  </div>
+</body>
+</html>

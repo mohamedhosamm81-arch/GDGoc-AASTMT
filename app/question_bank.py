@@ -83,16 +83,28 @@ def grade_quiz(questions: list[dict[str, Any]], responses: dict[str, dict[str, A
     points = 0
     solved = 0
     for question in questions:
-        correct = grade_question(question, responses.get(question["id"]))
+        user_resp = responses.get(question["id"]) or {}
+        correct = grade_question(question, user_resp)
         if correct:
             points += question["points"]
             solved += 1
+
+        # Format user answer for display
+        raw_user = user_resp.get("answer")
+        if raw_user is None:
+            raw_user = user_resp.get("output") or user_resp.get("code") or "(No answer)"
+
         results.append({
             "question_id": question["id"],
+            "number": question.get("number", 0),
+            "prompt": question.get("prompt", ""),
+            "type": question.get("type", "mcq"),
             "correct": correct,
             "points_awarded": question["points"] if correct else 0,
             "points_possible": question["points"],
             "explanation": question["explanation"],
+            "correct_answer": question["answer"],
+            "user_answer": str(raw_user),
         })
     return {
         "score_points": points,

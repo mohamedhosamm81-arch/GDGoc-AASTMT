@@ -139,6 +139,26 @@ def questions(quiz_id: int) -> dict[str, Any]:
 def create_session(payload: SessionRequest) -> dict[str, Any]:
     def upsert(data: dict[str, Any]) -> dict[str, Any]:
         students = data.setdefault("students", {})
+        normalized_name = re.sub(r"\s+", " ", payload.name).strip().casefold()
+
+        # Case 1: Same student_id already exists in this browser session → normal restore
+        if payload.student_id in students:
+            student = students[payload.student_id]
+            student["name"] = payload.name
+            student.setdefault("quizzes", {})
+            student.setdefault("progress", {})
+            student["last_seen"] = _utc_now()
+            return {"student_id": payload.student_id, "name": student["name"], "quizzes": student["quizzes"]}
+
+        # Case 2: New session (e.g. incognito or different device) tries to use an already taken name
+        for existing_id, existing_student in students.items():
+            if re.sub(r"\s+", " ", existing_student.get("name", "")).strip().casefold() == normalized_name:
+                raise HTTPException(
+                    status_code=400,
+                    detail="This name is already registered on the leaderboard! Since this is a competitive quiz, only one attempt is allowed per participant. Please enter your full name or a unique name.",
+                )
+
+        # Case 3: Brand new student with a unique name
         student = students.setdefault(payload.student_id, {"quizzes": {}, "progress": {}})
         student["name"] = payload.name
         student.setdefault("quizzes", {})
@@ -186,12 +206,19 @@ def check_answer(payload: AnswerRequest) -> dict[str, Any]:
     question = get_question(payload.question_id)
     if question is None or question["quiz_id"] != payload.quiz_id:
         raise HTTPException(status_code=404, detail="Question not found in this quiz")
+    resp = payload.response or {}
+    ans = str(resp.get("answer") if resp.get("answer") is not None else "").strip()
+    code = str(resp.get("code") if resp.get("code") is not None else "").strip()
+    actuals = resp.get("actuals")
+    output = resp.get("output")
+    if not ans and not code and actuals is None and output is None:
+        raise HTTPException(status_code=400, detail="Please provide an answer before checking")
     correct = grade_question(question, payload.response)
     return {
         "correct": correct,
         "points_awarded": question["points"] if correct else 0,
         "points_possible": question["points"],
-        "explanation": question["explanation"],
+        "explanation": question["explanation"] if correct else "Not quite right yet. Review your logic and try again!",
     }
 
 

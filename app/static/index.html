@@ -35,14 +35,14 @@
           <p class="lead">Take a breath, trust what you’ve learned, and work through each question one step at a time.</p>
           <div class="brand-badge"><span class="mini-brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span> Created by AI Team <span class="badge-divider">|</span> GDG on Campus AASTMT</div>
         </div>
-        <form class="name-card" id="name-form">
+        <form class="name-card" id="name-form" onsubmit="event.preventDefault(); return false;" action="javascript:void(0);">
           <div class="card-icon" aria-hidden="true">01</div>
           <h2>First, what should we call you?</h2>
           <p>Your name will appear on the round leaderboard. No password or sign-up needed.</p>
           <label for="student-name">Full name</label>
           <input id="student-name" name="name" type="text" autocomplete="name" maxlength="60" placeholder="e.g. Salma Hassan" required>
           <p class="form-error" id="name-error" role="alert" hidden></p>
-          <button class="button button-primary button-wide" type="submit">Enter Round 1 <span aria-hidden="true">→</span></button>
+          <button class="button button-primary button-wide" id="enter-round-btn" type="button">Enter Round 1 <span aria-hidden="true">→</span></button>
           <small class="privacy-note">Your score is saved for this session leaderboard. You can start without a password.</small>
         </form>
         <div class="welcome-ribbon" aria-hidden="true"><span>Learn</span><b>·</b><span>Try</span><b>·</b><span>Grow</span></div>
@@ -104,29 +104,43 @@
               <div class="editor-actions"><button class="button button-secondary" id="run-code" type="button"><span aria-hidden="true">▶</span> Run code</button><span class="editor-hint">Your code runs privately in your browser.</span></div>
               <div class="console-panel" id="console-panel" aria-live="polite"><div class="console-heading"><span class="console-light"></span> Console</div><pre id="console-output">Run your code to see its output here.</pre></div>
             </div>
-            <div class="answer-feedback" id="answer-feedback" role="status" hidden></div>
             <div class="question-footer">
               <button class="button button-secondary" id="previous-question" type="button" disabled>← Previous</button>
-              <button class="button button-secondary" id="check-answer" type="button">Check answer</button>
-              <span class="check-hint" id="check-hint">You can review your answer before finishing the quiz.</span>
-              <button class="button button-primary" id="next-question" type="button" disabled>Next question <span aria-hidden="true">→</span></button>
+              <button class="button button-primary" id="next-question" type="button">Next question <span aria-hidden="true">→</span></button>
             </div>
           </article>
           <aside class="quiz-rail">
-            <div class="rail-card">
-              <div class="rail-number">✦</div><h3>Small steps count</h3><p>Run your code, inspect the output, and adjust. You can move between questions before your final submission.</p>
+            <div class="rail-card question-palette-card">
+              <div class="palette-header">
+                <h3>Question Navigator</h3>
+                <div class="palette-legend">
+                  <small><span class="dot-legend dot-current"></span> Current</small>
+                  <small><span class="dot-legend dot-answered"></span> Answered</small>
+                </div>
+              </div>
+              <div class="question-palette" id="question-palette"></div>
             </div>
-            <div class="rail-tip"><span class="tip-icon">i</span><p>Only the <strong>first completed score in this browser session</strong> is saved for this quiz, so take your time.</p></div>
+            <div class="rail-card">
+              <div class="rail-number">✦</div><h3>Competitive Assessment</h3><p>Choose your answers and test code in the console. Full explanations and correct answers will be revealed after final submission.</p>
+            </div>
+            <div class="rail-tip"><span class="tip-icon">i</span><p>Only the <strong>first completed score in this browser session</strong> is counted on the leaderboard.</p></div>
           </aside>
         </div>
         <section class="quiz-result" id="quiz-result" aria-live="polite" hidden>
           <div class="result-mark" aria-hidden="true">✓</div>
           <div class="eyebrow"><span class="eyebrow-line"></span> QUIZ COMPLETE</div>
           <h2>Nice work, <span id="result-name">Explorer</span>.</h2>
-          <p class="result-lead">You finished Quiz <span id="result-quiz-number">1</span>. Every attempt is progress.</p>
+          <p class="result-lead">You finished Quiz <span id="result-quiz-number">1</span>. Here is your competitive score breakdown and answer review.</p>
           <div class="result-score"><strong id="result-points">0</strong><span>points earned</span><small id="result-solved">0 of 20 solved</small></div>
-          <p class="result-first-score" id="result-first-score">Your first completed score is saved to the leaderboard.</p>
+          <p class="result-first-score" id="result-first-score">Your score is saved to the leaderboard.</p>
           <div class="result-actions"><button class="button button-secondary" type="button" data-action="dashboard">Back to quizzes</button><button class="button button-primary" type="button" data-action="leaderboard">See live leaderboard →</button></div>
+          <div class="result-review" id="result-review">
+            <div class="review-header">
+              <h3>Question Review & Detailed Explanations</h3>
+              <p>See below for the correct answers, your responses, and full explanations for every question.</p>
+            </div>
+            <div class="review-list" id="review-list"></div>
+          </div>
         </section>
       </section>
 

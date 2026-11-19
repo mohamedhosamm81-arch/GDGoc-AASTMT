@@ -1,16 +1,57 @@
 from __future__ import annotations
 
+import contextlib
 import copy
-import fcntl
 import json
 import os
 import tempfile
 import threading
 from pathlib import Path
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, Iterator, TypeVar
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+
+try:
+    import msvcrt
+except ImportError:
+    msvcrt = None
 
 T = TypeVar("T")
 _DEFAULT_PATH = Path(__file__).resolve().parent.parent / "leaderboard.json"
+
+
+@contextlib.contextmanager
+def _file_lock(lock_file: Any, exclusive: bool = True) -> Iterator[None]:
+    if fcntl is not None:
+        mode = fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH
+        fcntl.flock(lock_file.fileno(), mode)
+        try:
+            yield
+        finally:
+            try:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                pass
+    elif msvcrt is not None:
+        fileno = lock_file.fileno()
+        try:
+            lock_file.seek(0)
+            msvcrt.locking(fileno, msvcrt.LK_LOCK, 1)
+        except OSError:
+            pass
+        try:
+            yield
+        finally:
+            try:
+                lock_file.seek(0)
+                msvcrt.locking(fileno, msvcrt.LK_UNLCK, 1)
+            except OSError:
+                pass
+    else:
+        yield
 
 
 class JsonStore:
@@ -39,24 +80,18 @@ class JsonStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self._thread_lock, self.lock_path.open("a+", encoding="utf-8") as lock_file:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_SH)
-            try:
+            with _file_lock(lock_file, exclusive=False):
                 return copy.deepcopy(self._read_unlocked())
-            finally:
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
     def update(self, operation: Callable[[dict[str, Any]], T]) -> T:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self._thread_lock, self.lock_path.open("a+", encoding="utf-8") as lock_file:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-            try:
+            with _file_lock(lock_file, exclusive=True):
                 data = self._read_unlocked()
                 result = operation(data)
                 self._write_unlocked(data)
                 return copy.deepcopy(result)
-            finally:
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
     def _write_unlocked(self, data: dict[str, Any]) -> None:
         fd, temp_name = tempfile.mkstemp(
@@ -69,11 +104,15 @@ class JsonStore:
                 stream.flush()
                 os.fsync(stream.fileno())
             os.replace(temp_name, self.path)
-            directory_fd = os.open(self.path.parent, os.O_RDONLY)
-            try:
-                os.fsync(directory_fd)
-            finally:
-                os.close(directory_fd)
+            if os.name != "nt":
+                try:
+                    directory_fd = os.open(self.path.parent, os.O_RDONLY)
+                    try:
+                        os.fsync(directory_fd)
+                    finally:
+                        os.close(directory_fd)
+                except OSError:
+                    pass
         except Exception:
             try:
                 os.unlink(temp_name)

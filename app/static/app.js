@@ -26,11 +26,29 @@ const state = {
   toastTimer: null,
 };
 
-async function api(path, options = {}) {
-  const response = await fetch(path, {
-    ...options,
-    headers: { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) },
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try {
+      return crypto.randomUUID();
+    } catch (_) {}
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
   });
+}
+
+async function api(path, options = {}) {
+  let response;
+  try {
+    response = await fetch(path, {
+      ...options,
+      headers: { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) },
+    });
+  } catch (_) {
+    throw new Error('Unable to connect to the server! Please wait a moment and try again.');
+  }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const detail = data.detail;
@@ -64,7 +82,25 @@ function setTopbarStudent() {
   const name = document.createElement('strong');
   name.textContent = state.session.name;
   text.append(name);
-  slot.append(text);
+
+  const logoutBtn = document.createElement('button');
+  logoutBtn.type = 'button';
+  logoutBtn.className = 'text-button';
+  logoutBtn.style.marginLeft = '12px';
+  logoutBtn.style.color = '#d93025';
+  logoutBtn.style.fontWeight = '600';
+  logoutBtn.textContent = 'Log Out ✕';
+  logoutBtn.title = 'Log out to start with a new participant';
+  logoutBtn.addEventListener('click', () => {
+    localStorage.removeItem(storageKey);
+    state.session = null;
+    slot.hidden = true;
+    const input = $('#student-name');
+    if (input) input.value = '';
+    showView('welcome');
+  });
+
+  slot.append(text, logoutBtn);
   slot.hidden = false;
 }
 
@@ -315,15 +351,45 @@ async function saveProgress() {
   }
 }
 
-function setResponse(question, response, invalidateCheck = true) {
-  state.responses[question.id] = response;
-  if (invalidateCheck) {
-    delete state.checked[question.id];
-    delete state.feedback[question.id];
-    $('#answer-feedback').hidden = true;
-    $('#next-question').disabled = true;
+function isQuestionAnswered(question) {
+  if (!question) return false;
+  const r = state.responses[question.id];
+  if (question.type === 'mcq' || question.type === 'fill_blank' || question.type === 'predict') {
+    return Boolean(r && r.answer !== undefined && r.answer !== null && String(r.answer).trim().length > 0);
   }
+  if (question.type === 'code' || question.type === 'fix_bug') {
+    const code = r && r.code !== undefined ? r.code : (state.editor ? state.editor.getValue() : '');
+    return Boolean(code && code.trim().length > 0);
+  }
+  return false;
+}
+
+function updatePalette() {
+  const container = $('#question-palette');
+  if (!container || !state.questions || !state.questions.length) return;
+  container.replaceChildren();
+  state.questions.forEach((q, idx) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'palette-btn';
+    btn.textContent = String(idx + 1);
+    if (idx === state.index) btn.classList.add('is-current');
+    if (isQuestionAnswered(q)) btn.classList.add('is-answered');
+    btn.addEventListener('click', () => {
+      if (idx !== state.index) {
+        state.index = idx;
+        renderQuestion();
+        scheduleProgressSave();
+      }
+    });
+    container.append(btn);
+  });
+}
+
+function setResponse(question, response) {
+  state.responses[question.id] = { ...(state.responses[question.id] || {}), ...response };
   scheduleProgressSave();
+  updatePalette();
 }
 
 function renderAnswerArea(question) {
@@ -367,7 +433,9 @@ function renderAnswerArea(question) {
       field.placeholder = 'Type the exact output…';
     } else field.placeholder = 'Type your answer…';
     field.value = saved.answer || '';
-    field.addEventListener('input', () => setResponse(question, { answer: field.value }));
+    field.addEventListener('input', () => {
+      setResponse(question, { answer: field.value });
+    });
     area.append(field);
   }
 }
@@ -407,33 +475,23 @@ function renderQuestion() {
     const starter = question.type === 'fix_bug' ? question.starter_code : question.starter_code;
     const initialCode = saved.code ?? starter ?? '';
     state.editor = mountEditor($('#code-editor'), initialCode, (value) => {
-      const previous = responseFor(question);
-      setResponse(question, { code: value }, true);
-      if (previous.code !== value) {
-        $('#console-output').textContent = 'Code changed. Run it again to update the output.';
-        $('#console-panel').classList.remove('has-output', 'has-error');
-      }
+      setResponse(question, { code: value });
+      $('#console-output').textContent = 'Code changed. Click "▶ Run code" to test.';
+      $('#console-panel').classList.remove('has-output', 'has-error');
     });
-    $('#console-output').textContent = 'Run your code to see its output here.';
+    $('#console-output').textContent = 'Click "▶ Run code" to test your snippet in the console.';
     $('#console-panel').classList.remove('has-output', 'has-error');
   }
   updateProgressDisplay(question);
-  const checked = Boolean(state.checked[question.id]);
-  $('#next-question').disabled = !checked;
-  $('#check-answer').disabled = false;
-  $('#check-answer').textContent = checked ? 'Check again' : 'Check answer';
-  const existingFeedback = state.feedback[question.id];
-  if (existingFeedback) displayFeedback(existingFeedback);
-  else $('#answer-feedback').hidden = true;
-  $('#check-hint').textContent = checked ? 'You can revisit this answer before finishing.' : 'You can review your answer before finishing the quiz.';
+  $('#next-question').disabled = false;
+  updatePalette();
 }
 
-async function executeCurrent(forCheck = false) {
+async function executeCurrent() {
   const question = currentQuestion();
   if (!state.editor) throw new Error('Editor is not ready.');
   const code = state.editor.getValue();
-  setResponse(question, { code }, false);
-  const mode = question.type === 'code' ? (forCheck ? 'function_tests' : 'function_preview') : 'script';
+  const mode = question.type === 'code' ? 'function_tests' : 'script';
   const result = await runPython({
     code,
     mode,
@@ -441,61 +499,90 @@ async function executeCurrent(forCheck = false) {
     testCases: question.test_cases || [],
   }, (status) => {
     $('#run-code').disabled = true;
-    $('#check-answer').disabled = true;
     if (status) $('#console-output').textContent = status;
-    else {
-      $('#run-code').disabled = false;
-      $('#check-answer').disabled = false;
-    }
+    else $('#run-code').disabled = false;
   });
-  const output = result.error ? `Error: ${result.error}` : (result.output || '(No output)');
+  const output = result.error ? `Error: ${result.error}` : (result.output || '(No console output)');
   $('#console-output').textContent = output;
   $('#console-panel').classList.toggle('has-output', !result.error);
   $('#console-panel').classList.toggle('has-error', Boolean(result.error));
   const response = question.type === 'code'
     ? { code, actuals: result.actuals || [], error: result.error || null, output: result.output || '' }
     : { code, output: result.output || '', error: result.error || null };
-  setResponse(question, response, false);
+  setResponse(question, response);
   return response;
 }
 
-function displayFeedback(feedback) {
-  const box = $('#answer-feedback');
-  box.className = `answer-feedback ${feedback.correct ? 'correct' : 'incorrect'}`;
-  box.replaceChildren();
-  const symbol = document.createElement('strong');
-  symbol.textContent = feedback.correct ? 'That’s right.' : 'Not quite yet.';
-  const text = document.createElement('span');
-  text.textContent = `${feedback.explanation} ${feedback.correct ? `+${feedback.points_awarded} ${feedback.points_awarded === 1 ? 'point' : 'points'}.` : ''}`;
-  box.append(symbol, text);
-  box.hidden = false;
-}
-
-async function checkCurrentAnswer() {
-  const question = currentQuestion();
-  const button = $('#check-answer');
-  button.disabled = true;
-  button.textContent = 'Checking…';
-  try {
-    let response;
-    if (question.type === 'code' || question.type === 'fix_bug') response = await executeCurrent(true);
-    else response = responseFor(question);
-    const result = await api('/api/check', {
-      method: 'POST',
-      body: JSON.stringify({ quiz_id: state.quizId, question_id: question.id, response }),
-    });
-    state.checked[question.id] = true;
-    state.feedback[question.id] = result;
-    displayFeedback(result);
-    $('#next-question').disabled = false;
-    $('#check-hint').textContent = 'Answer checked. You can revise it and check again before moving on.';
-    await saveProgress();
-  } catch (error) {
-    showToast(error.message || 'Could not check that answer.');
-  } finally {
-    button.disabled = false;
-    button.textContent = state.checked[question.id] ? 'Check again' : 'Check answer';
+function renderReview(results) {
+  const container = $('#review-list');
+  if (!container) return;
+  container.replaceChildren();
+  if (!Array.isArray(results) || !results.length) {
+    container.innerHTML = '<p class="empty-state">No question review data available.</p>';
+    return;
   }
+  const fragment = document.createDocumentFragment();
+  results.forEach((item, index) => {
+    const card = document.createElement('div');
+    card.className = `review-card ${item.correct ? 'is-correct' : 'is-incorrect'}`;
+
+    const head = document.createElement('div');
+    head.className = 'review-card-head';
+    
+    const num = document.createElement('span');
+    num.className = 'review-q-num';
+    num.textContent = `QUESTION ${String(item.number || index + 1).padStart(2, '0')}`;
+
+    const badge = document.createElement('span');
+    badge.className = `review-badge ${item.correct ? 'correct' : 'incorrect'}`;
+    badge.textContent = item.correct 
+      ? `✓ Correct (+${item.points_awarded} pts)` 
+      : `✗ Incorrect (0/${item.points_possible} pts)`;
+
+    head.append(num, badge);
+
+    const prompt = document.createElement('h4');
+    prompt.className = 'review-prompt';
+    prompt.textContent = item.prompt || `Question ${index + 1}`;
+
+    const answers = document.createElement('div');
+    answers.className = 'review-answers';
+
+    const userRow = document.createElement('div');
+    userRow.className = 'review-ans-row';
+    const userLabel = document.createElement('span');
+    userLabel.className = 'review-ans-label';
+    userLabel.textContent = 'Your answer:';
+    const userVal = document.createElement('span');
+    userVal.className = 'review-ans-val';
+    userVal.textContent = item.user_answer || '(No answer provided)';
+    userRow.append(userLabel, userVal);
+
+    const correctRow = document.createElement('div');
+    correctRow.className = 'review-ans-row';
+    const correctLabel = document.createElement('span');
+    correctLabel.className = 'review-ans-label';
+    correctLabel.textContent = 'Correct answer:';
+    const correctVal = document.createElement('span');
+    correctVal.className = 'review-ans-val correct-val';
+    const cleanAns = typeof item.correct_answer === 'object' ? JSON.stringify(item.correct_answer) : String(item.correct_answer ?? '');
+    correctVal.textContent = cleanAns;
+    correctRow.append(correctLabel, correctVal);
+
+    answers.append(userRow, correctRow);
+
+    const explanation = document.createElement('div');
+    explanation.className = 'review-explanation';
+    const expTitle = document.createElement('strong');
+    expTitle.textContent = '💡 EXPLANATION';
+    const expText = document.createElement('span');
+    expText.textContent = item.explanation || 'No explanation provided.';
+    explanation.append(expTitle, expText);
+
+    card.append(head, prompt, answers, explanation);
+    fragment.append(card);
+  });
+  container.append(fragment);
 }
 
 function navigateQuestion(delta) {
@@ -507,25 +594,32 @@ function navigateQuestion(delta) {
 }
 
 function finishQuizPrompt() {
-  const unanswered = state.questions.filter((question) => !state.checked[question.id]).length;
-  $('#finish-copy').textContent = unanswered
-    ? `${unanswered} question${unanswered === 1 ? ' is' : 's are'} not checked yet. Unchecked answers will not earn points. Your first completed score will be saved.`
-    : 'Your checked answers will be submitted. This will be the saved first score for this quiz.';
+  const answeredCount = state.questions.filter((q) => isQuestionAnswered(q)).length;
+  const unanswered = state.questions.length - answeredCount;
+  $('#finish-copy').textContent = unanswered > 0
+    ? `You have answered ${answeredCount} of ${state.questions.length} questions (${unanswered} unanswered). Are you sure you want to submit your final score?`
+    : 'All questions have been answered. Ready to submit your final score to the leaderboard and review your answers?';
   $('#finish-dialog').showModal();
 }
 
 async function submitQuiz() {
   $('#confirm-finish').disabled = true;
-  $('#confirm-finish').textContent = 'Saving score…';
+  $('#confirm-finish').textContent = 'Submitting score…';
   try {
-    const checkedAnswers = Object.fromEntries(
+    const currentQ = currentQuestion();
+    if (currentQ && (currentQ.type === 'code' || currentQ.type === 'fix_bug') && state.editor) {
+      try {
+        await executeCurrent();
+      } catch (_) {}
+    }
+    const allAnswers = Object.fromEntries(
       state.questions
-        .filter((question) => state.checked[question.id] && state.responses[question.id])
+        .filter((question) => state.responses[question.id])
         .map((question) => [question.id, state.responses[question.id]]),
     );
     const result = await api(`/api/submit/${state.quizId}`, {
       method: 'POST',
-      body: JSON.stringify({ student_id: studentId(), quiz_id: state.quizId, answers: checkedAnswers }),
+      body: JSON.stringify({ student_id: studentId(), quiz_id: state.quizId, answers: allAnswers }),
     });
     $('#finish-dialog').close();
     const quizRecord = {
@@ -534,6 +628,7 @@ async function submitQuiz() {
       solved: result.solved,
       question_count: result.question_count,
       completed_at: result.completed_at,
+      results: result.results || [],
     };
     state.session.quizzes = { ...(state.session.quizzes || {}), [String(state.quizId)]: quizRecord };
     saveSessionLocally();
@@ -557,9 +652,10 @@ function showQuizResult(result) {
   $('#result-points').textContent = String(result.score_points);
   $('#result-solved').textContent = `${result.solved} of ${result.question_count} questions solved · ${result.possible_points} possible points`;
   $('#result-first-score').textContent = result.first_score_kept
-    ? 'Your original first score is still saved; a repeat submission cannot change it.'
-    : 'Your first completed score is saved to the leaderboard.';
+    ? 'Your score on the leaderboard is kept from your first attempt.'
+    : 'Your score has been submitted to the live leaderboard!';
   panel.hidden = false;
+  renderReview(result.results || []);
   showView('quiz');
 }
 
@@ -584,35 +680,51 @@ async function refreshDashboardTotals() {
 }
 
 async function handleNameSubmit(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
+  if (event && event.preventDefault) event.preventDefault();
   const input = $('#student-name');
   const error = $('#name-error');
-  error.hidden = true;
-  const name = input.value.trim().replace(/\s+/g, ' ');
+  if (error) error.hidden = true;
+  const name = (input ? input.value : '').trim().replace(/\s+/g, ' ');
   if (name.length < 2) {
-    error.textContent = 'Please enter your full name (at least 2 characters).';
-    error.hidden = false;
-    input.focus();
+    if (error) {
+      error.textContent = 'Please enter your full name (at least 2 characters).';
+      error.hidden = false;
+    }
+    if (input) input.focus();
     return;
   }
-  const id = crypto.randomUUID();
-  const button = form.querySelector('button[type="submit"]');
-  button.disabled = true;
+  const id = generateUUID();
+  const button = $('#enter-round-btn') || document.querySelector('#name-form button');
+  if (button) button.disabled = true;
   try {
     state.session = await api('/api/session', { method: 'POST', body: JSON.stringify({ student_id: id, name }) });
     saveSessionLocally();
+    setTopbarStudent();
     await renderDashboard();
   } catch (apiError) {
-    error.textContent = apiError.message;
-    error.hidden = false;
+    if (error) {
+      error.textContent = apiError.message;
+      error.hidden = false;
+    }
   } finally {
-    button.disabled = false;
+    if (button) button.disabled = false;
   }
 }
 
 function bindEvents() {
-  $('#name-form').addEventListener('submit', handleNameSubmit);
+  const form = $('#name-form');
+  if (form) form.addEventListener('submit', handleNameSubmit);
+  const enterBtn = $('#enter-round-btn');
+  if (enterBtn) enterBtn.addEventListener('click', handleNameSubmit);
+  const nameInput = $('#student-name');
+  if (nameInput) {
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleNameSubmit(e);
+      }
+    });
+  }
   document.body.addEventListener('click', (event) => {
     const target = event.target.closest('[data-action]');
     if (!target) return;
@@ -626,11 +738,13 @@ function bindEvents() {
   });
   $('#close-info').addEventListener('click', () => $('#info-dialog').close());
   $('#refresh-leaderboard').addEventListener('click', openLeaderboard);
-  $('#check-answer').addEventListener('click', checkCurrentAnswer);
-  $('#run-code').addEventListener('click', async () => {
-    try { await executeCurrent(false); }
-    catch (error) { $('#console-output').textContent = `Error: ${error.message}`; $('#console-panel').classList.add('has-error'); }
-  });
+  const runBtn = $('#run-code');
+  if (runBtn) {
+    runBtn.addEventListener('click', async () => {
+      try { await executeCurrent(); }
+      catch (error) { $('#console-output').textContent = `Error: ${error.message}`; $('#console-panel').classList.add('has-error'); }
+    });
+  }
   $('#previous-question').addEventListener('click', () => navigateQuestion(-1));
   $('#next-question').addEventListener('click', () => {
     if ($('#next-question').disabled) return;
@@ -662,5 +776,15 @@ async function restoreSession() {
 
 bindEvents();
 restoreSession().then((restored) => {
-  if (!restored) showView('welcome');
+  if (!restored) {
+    showView('welcome');
+    const params = new URLSearchParams(window.location.search);
+    const queryName = params.get('name');
+    if (queryName && queryName.trim().length >= 2) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      const input = $('#student-name');
+      if (input) input.value = queryName.trim();
+      handleNameSubmit();
+    }
+  }
 });

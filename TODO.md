@@ -35,4 +35,4 @@
 - [x] Create a branded README with dependency installation and run instructions, scoring/attempt policy, and JSON-storage limitations.
 - [x] Create a `.gitignore` that ignores `__pycache__/`, `.venv/`, `node_modules/`, `.DS_Store`, generated `leaderboard.json`, and other local build/runtime artifacts.
 - [x] Serve a correct `GET /manus-routes.json` manifest for the page route(s), excluding APIs/assets.
-- [ ] The source prompt’s GitHub repository target is a placeholder; do not invent a GitHub destination. Save the finished project to the current managed project’s canonical `main` remote for a checkpoint; no separate public repository or public publishing is requested.
+- [x] The source prompt’s GitHub repository target is a placeholder; do not invent a GitHub destination. Save the finished project to the current managed project’s canonical `main` remote for a checkpoint; no separate public repository or public publishing is requested.
